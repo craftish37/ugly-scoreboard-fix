@@ -8,11 +8,17 @@ import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import lombok.Getter;
 import me.lortseam.uglyscoreboardfix.UglyScoreboardFix;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.scoreboard.ScoreboardDisplaySlot;
+import net.minecraft.scoreboard.ScoreboardEntry;
+import net.minecraft.scoreboard.ScoreboardObjective;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import org.spongepowered.asm.mixin.Unique;
 
 import java.awt.Color;
+import java.util.Arrays;
 
 @Getter
 public class ModConfig {
@@ -78,10 +84,26 @@ public class ModConfig {
         HANDLER.save();
     }
 
+    public static boolean scoresAreConsecutive(ScoreboardObjective objective) {
+        long previ = Long.MIN_VALUE;  // Long, so that no score (Int) can match Long.MIN_VALUE
+        for (int i : objective.getScoreboard().getScoreboardEntries(objective).stream().mapToInt(ScoreboardEntry::value).limit(UglyScoreboardFix.getConfig().getMaxLineCount()).sorted().toArray()) {
+            if (previ != Long.MIN_VALUE && i != previ + 1)
+                return false;
+            previ = i;
+        }
+        return objective.getScoreboard().getScoreboardEntries(objective).size() > 1;
+    }
+
     public void toggleHideScores() {
         hideScores = switch (hideScores) {
             case Yes -> HideScores.No;
-            case No, Auto -> HideScores.Yes;
+            case No -> HideScores.Yes;
+            case Auto -> {
+                if (MinecraftClient.getInstance().world == null)
+                    yield HideScores.No;
+                ScoreboardObjective objective = MinecraftClient.getInstance().world.getScoreboard().getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR);
+                yield (objective != null && scoresAreConsecutive(objective)) ? HideScores.No : HideScores.Yes;
+            }
         };
         HANDLER.save();
     }
@@ -233,7 +255,7 @@ public class ModConfig {
                                         .build())
                                 .option(Option.<Color>createBuilder()
                                         .name(Text.literal("Scores color"))
-                                        .description(OptionDescription.of(Text.literal("Color of the scores.\n\nDefault is #FF0000.")))
+                                        .description(OptionDescription.of(Text.literal("Color of the scores.\n\nDefault is #FF5555.")))
                                         .binding(
                                                 scoreForegroundColor,
                                                 this::getScoreForegroundColor,
@@ -299,6 +321,6 @@ public class ModConfig {
                                         .build())
                                 .build())
                         .build())
-                .save(ModConfig.HANDLER::save);
+                .save(HANDLER::save);
     }
 }

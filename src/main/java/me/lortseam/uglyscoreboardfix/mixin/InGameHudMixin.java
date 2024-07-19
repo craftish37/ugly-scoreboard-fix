@@ -6,7 +6,6 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.hud.DebugHud;
 import net.minecraft.client.gui.hud.InGameHud;
-import net.minecraft.scoreboard.ScoreboardEntry;
 import net.minecraft.scoreboard.ScoreboardObjective;
 import net.minecraft.scoreboard.number.BlankNumberFormat;
 import net.minecraft.scoreboard.number.NumberFormat;
@@ -17,8 +16,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import java.util.Arrays;
 
 @Mixin(InGameHud.class)
 public abstract class InGameHudMixin {
@@ -58,22 +55,9 @@ public abstract class InGameHudMixin {
         scaledHeight = oldScaledHeight;
     }
 
-    @Unique
-    private static boolean uglyscoreboardfix$scoresAreConsecutive(ScoreboardObjective objective) {
-        long previ = Long.MIN_VALUE;  // Long, so that no score (Int) can match Long.MIN_VALUE
-        int[] arr = objective.getScoreboard().getScoreboardEntries(objective).stream().mapToInt(ScoreboardEntry::value).limit(UglyScoreboardFix.getConfig().getMaxLineCount()).sorted().toArray();
-        System.out.println(Arrays.toString(arr));
-        for (int i : arr) {
-            if (previ != Long.MIN_VALUE && i != previ + 1)
-                return false;
-            previ = i;
-        }
-        return objective.getScoreboard().getScoreboardEntries(objective).size() > 1;
-    }
-
     @ModifyVariable(method = "renderScoreboardSidebar", at = @At(value = "STORE"))
     private NumberFormat uglyscoreboardfix$modifyNumberFormat(NumberFormat numberFormat, DrawContext context, ScoreboardObjective objective) {
-        if (UglyScoreboardFix.getConfig().getHideScores() == ModConfig.HideScores.Yes || (UglyScoreboardFix.getConfig().getHideScores() == ModConfig.HideScores.Auto && uglyscoreboardfix$scoresAreConsecutive(objective)))
+        if (UglyScoreboardFix.getConfig().getHideScores() == ModConfig.HideScores.Yes || (UglyScoreboardFix.getConfig().getHideScores() == ModConfig.HideScores.Auto && ModConfig.scoresAreConsecutive(objective)))
             return BlankNumberFormat.INSTANCE;
         else
             return numberFormat;
@@ -110,30 +94,36 @@ public abstract class InGameHudMixin {
     private int uglyscoreboardfix$drawHeadingText(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color, boolean shadow) {
         if (UglyScoreboardFix.getConfig().isHideTitle())
             return 0;
+        color = UglyScoreboardFix.getConfig().getHeadingForegroundColor().getRGB();
+        if (UglyScoreboardFix.getConfig().isForceHeadingForegroundColor())
+            text = text.copy().withColor(color);
         if (UglyScoreboardFix.getConfig().getHorizontalPosition() == ModConfig.HorizontalPosition.Left)
             x -= xShift;
         y += UglyScoreboardFix.getConfig().getYOffset();
-        color = UglyScoreboardFix.getConfig().getHeadingForegroundColor().getRGB();
         shadow = UglyScoreboardFix.getConfig().isHeadingShadow();
         return context.drawText(textRenderer, text, x, y, color, shadow);
     }
 
     @Redirect(method = "method_55440", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;drawText(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;IIIZ)I", ordinal = 1))
     private int uglyscoreboardfix$drawText(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color, boolean shadow) {
+        color = UglyScoreboardFix.getConfig().getForegroundColor().getRGB();
+        if (UglyScoreboardFix.getConfig().isForceForegroundColor())
+            text = text.copy().withColor(color);
         if (UglyScoreboardFix.getConfig().getHorizontalPosition() == ModConfig.HorizontalPosition.Left)
             x -= xShift;
         y += UglyScoreboardFix.getConfig().getYOffset();
-        color = UglyScoreboardFix.getConfig().getForegroundColor().getRGB();
         shadow = UglyScoreboardFix.getConfig().isShadow();
         return context.drawText(textRenderer, text, x, y, color, shadow);
     }
 
     @Redirect(method = "method_55440", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;drawText(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;IIIZ)I", ordinal = 2))
     private int uglyscoreboardfix$drawScoreText(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color, boolean shadow) {
+        color = UglyScoreboardFix.getConfig().getScoreForegroundColor().getRGB();
+        if (UglyScoreboardFix.getConfig().isForceScoreForegroundColor())
+            text = text.copy().withColor(color);
         if (UglyScoreboardFix.getConfig().getHorizontalPosition() == ModConfig.HorizontalPosition.Left)
             x -= xShift;
         y += UglyScoreboardFix.getConfig().getYOffset();
-        color = UglyScoreboardFix.getConfig().getScoreForegroundColor().getRGB();
         shadow = UglyScoreboardFix.getConfig().isScoreShadow();
         return context.drawText(textRenderer, text, x, y, color, shadow);
     }
